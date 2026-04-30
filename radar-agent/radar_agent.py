@@ -4,6 +4,7 @@ import time
 import requests
 import feedparser
 from urllib.parse import quote
+from openai import OpenAI
 
 # ================= 配置与环境变量 =================
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -44,15 +45,19 @@ def universal_fetcher(source_name, target_url):
 
 def analyze_with_gemini(title, content, source):
     """
-    使用 Gemini 3.1 Flash Lite 进行情报提纯
-    保持代码干爽，仅保留最基础的解析逻辑
+    终极架构：通过 OpenAI SDK 兼容层精准调用 gemini-3.1-flash-lite
+    代码极度干爽，将网络底层逻辑全盘交给官方 SDK
     """
     if not GEMINI_API_KEY:
+        print("🚨 错误：未检测到 GEMINI_API_KEY")
         return None
 
-    # 🎯 严格锁定 Gemini 3.1 Flash Lite 模型
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={GEMINI_API_KEY}"
-    
+    # 初始化 OpenAI 客户端，但把枪口对准 Google 的服务器
+    client = OpenAI(
+        api_key=GEMINI_API_KEY,
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+    )
+
     prompt = f"""
     作为专业情报员，请将以下内容提取为纯 JSON。
     来源：{source} | 标题：{title}
@@ -69,22 +74,29 @@ def analyze_with_gemini(title, content, source):
     """
 
     try:
-        payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        resp = requests.post(url, json=payload, timeout=30)
-        
-        if resp.status_code != 200:
-            print(f"  └─ ❌ [API拒绝] 状态码: {resp.status_code}")
-            return None
+        # 🎯 完美调用你指定的 3.1 Lite 模型
+        res = client.chat.completions.create(
+            model="gemini-3.1-flash-lite",
+            messages=[
+                {"role": "system", "content": "你是一个只输出 JSON 格式的情报分析机器。"},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+            timeout=30
+        )
 
-        result = resp.json()
-        raw_text = result['candidates'][0]['content']['parts'][0]['text'].strip()
+        raw_text = res.choices[0].message.content.strip()
         
-        # 移除可能存在的 Markdown 包裹，保持干爽
-        cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
+        # 极简清洗：去掉可能带有的 Markdown 代码块标记
+        cleaned_text = raw_text.replace("
+```json", "").replace("```", "").strip()
         return json.loads(cleaned_text)
 
+    except json.JSONDecodeError as e:
+        print(f"  └─ ⚠️ [格式错误] 模型输出非标准 JSON: {e}")
+        return None
     except Exception as e:
-        print(f"  └─ ⚠️ [提纯失败] {e}")
+        print(f"  └─ ❌ [API调用失败] {e}")
         return None
 
 # ================= 主控制流 =================
@@ -93,9 +105,9 @@ def main():
     if not config: return
 
     all_raw_data = []
-    print("\n⚡ 矩阵引擎启动，正在切换至 Gemini 3.1 Flash 轨道...\n")
+    print("\n⚡ 矩阵引擎启动，正在切入 Gemini 3.1 Flash Lite 轨道...\n")
 
-    # 1. 采集
+    # 1. 采集数据
     for source in config.get("sources", []):
         print(f"▶ 数据源: {source['name']}")
         for interest in config.get("interests", []):
@@ -114,20 +126,35 @@ def main():
         print(f"🎯 处理: {item['title'][:40]}...")
         ai_data = analyze_with_gemini(item['title'], item['content'], item['source'])
         
+        # 分数阈值卡在 5 分，及格线以上才入库
         if ai_data and int(ai_data.get("importance_score", 0)) >= 5:
-            print(f"✅ 评分: {ai_data['importance_score']} | 入库中...")
-            payload = {**ai_data, "title": item["title"], "url": item["url"], 
-                       "source_type": item["source"], "interest_id": item["interest_id"]}
+            print(f"✅ 评分: {ai_data['importance_score']} | 正在跨海入库...")
+            
+            payload = {
+                "title": item["title"],
+                "summary": ai_data["summary"],
+                "url": item["url"],
+                "source_type": item["source"],
+                "tags": ai_data["tags"],
+                "importance_score": ai_data["importance_score"],
+                "tech_difficulty": ai_data["tech_difficulty"],
+                "social_value": ai_data["social_value"],
+                "interest_id": item["interest_id"]
+            }
             
             try:
-                requests.post(CF_WORKER_URL, json=payload, 
-                              headers={"Authorization": f"Bearer {AUTH_TOKEN}"}, timeout=10)
-            except:
-                pass
+                res = requests.post(CF_WORKER_URL, json=payload, headers={"Authorization": f"Bearer {AUTH_TOKEN}"}, timeout=10)
+                if res.status_code == 200:
+                    print(f"🚀 [入库成功]！")
+                else:
+                    print(f"⚠️ [入库失败] 状态码: {res.status_code}")
+            except Exception as e:
+                print(f"⚠️ [网络异常] 无法连接 Worker: {e}")
         else:
             print(f"🗑️ [抛弃] 价值不足或处理失败")
             
-        time.sleep(1.2) # 500次/天，每秒跑一条绰绰有余
+        print("⏳ 冷却管线 1.5 秒...\n")
+        time.sleep(1.5) # 完美适配每天 500 次的限流节奏
 
 if __name__ == "__main__":
     main()
