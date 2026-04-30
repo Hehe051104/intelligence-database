@@ -76,7 +76,7 @@ def analyze_with_gemini(title, content, source):
     try:
         # 🎯 完美调用你指定的 3.1 Lite 模型
         res = client.chat.completions.create(
-            model="gemini-3.1-flash-lite",
+            model="gemini-3.1-flash-lite-preview",
             messages=[
                 {"role": "system", "content": "你是一个只输出 JSON 格式的情报分析机器。"},
                 {"role": "user", "content": prompt}
