@@ -43,7 +43,7 @@ def universal_fetcher(source_name, target_url):
         print(f"  └─ ❌ [抓取中断] {e}")
         return []
 
-def analyze_with_gemini(title, content, source, interest_context=None):
+def analyze_with_gemini(title, content, source, interest_context=None, max_retries=3):
     """
     终极架构：精准对接 gemini-3.1-flash-lite-preview
     作为语义守门员，过滤无关、灌水内容，输出极专业标签
@@ -83,27 +83,43 @@ def analyze_with_gemini(title, content, source, interest_context=None):
         "social_value": "一句话描述对该领域的价值"
     }}
     """
-    try:
-        res = client.chat.completions.create(
-            model="gemini-3.1-flash-lite-preview",
-            messages=[
-                {"role": "system", "content": "你是 SPEC-2026 的专业情报分析系统，严格输出 JSON 格式，绝不包含 Markdown 代码块。"},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.1,
-            timeout=30
-        )
 
-        raw_text = res.choices[0].message.content.strip()
-        cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
-        return json.loads(cleaned_text)
+    # 重试循环
+    for attempt in range(max_retries):
+        try:
+            res = client.chat.completions.create(
+                model="gemini-3.1-flash-lite-preview",
+                messages=[
+                    {"role": "system", "content": "你是 SPEC-2026 的专业情报分析系统，严格输出 JSON 格式，绝不包含 Markdown 代码块。"},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.1,
+                timeout=30
+            )
 
-    except json.JSONDecodeError as e:
-        print(f"  └─ ⚠️ [格式错误] 模型输出非标准 JSON: {e}")
-        return None
-    except Exception as e:
-        print(f"  └─ ❌ [API调用失败] {e}")
-        return None
+            raw_text = res.choices[0].message.content.strip()
+            cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
+            return json.loads(cleaned_text)
+
+        except json.JSONDecodeError as e:
+            print(f"  └─ ⚠️ [格式错误] 模型输出非标准 JSON: {e}")
+            return None
+        except Exception as e:
+            error_str = str(e)
+            # 检查是否为可重试错误（503 或 timeout）
+            if "503" in error_str or "timed out" in error_str.lower():
+                # 指数退避等待
+                wait_time = 2 ** attempt
+                print(f"  └─ ⚠️ [暂时不可用] 第 {attempt + 1}/{max_retries} 次重试，等待 {wait_time} 秒...")
+                time.sleep(wait_time)
+            else:
+                # 其他致命错误，直接返回
+                print(f"  └─ ❌ [致命错误] {e}")
+                return None
+
+    # 循环结束仍未成功
+    print(f"  └─ ❌ [重试耗尽] 已重试 {max_retries} 次均失败")
+    return None
 
 # ================= 主控制流 =================
 def main():
