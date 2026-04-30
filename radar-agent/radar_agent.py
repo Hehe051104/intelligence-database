@@ -106,9 +106,12 @@ def analyze_with_gemini(title, content, source, interest_context=None, max_retri
             return None
         except Exception as e:
             error_str = str(e)
-            # 检查是否为可重试错误（503 或 timeout）
-            if "503" in error_str or "timed out" in error_str.lower():
-                # 指数退避等待
+            # 检查是否为 429 限流错误（Gemini 免费版限制 15 RPM）
+            if "429" in error_str:
+                print(f"  └─ ⚠️ [触发限流] 第 {attempt + 1}/{max_retries} 次重试，等待 60 秒...")
+                time.sleep(60)
+            elif "503" in error_str or "timed out" in error_str.lower():
+                # 指数退避等待（非限流错误）
                 wait_time = 2 ** attempt
                 print(f"  └─ ⚠️ [暂时不可用] 第 {attempt + 1}/{max_retries} 次重试，等待 {wait_time} 秒...")
                 time.sleep(wait_time)
@@ -158,6 +161,10 @@ def main():
             item['source'],
             interest_context=interest_config
         )
+
+        # 🛡️ 关键节流阀：强制冷却 4 秒（无论分析结果如何），适配 15 RPM 限额
+        print("⏳ 全局节流阀 4 秒...")
+        time.sleep(4)
 
         if ai_data is None:
             print(f"🗑️ [抛弃] 分析失败")
