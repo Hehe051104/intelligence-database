@@ -99,7 +99,7 @@
                 div.innerHTML = `
                     <div class="flex justify-between items-center mb-4">
                         <span class="text-[11px] font-bold px-2 py-1 rounded badge-${item.source_type.replace(/\W/g,'_')} bg-zinc-100">${item.source_type}</span>
-                        <div class="flex gap-2"><span class="text-[10px] bg-zinc-800 text-white px-2 py-0.5 rounded-full">${item.interest_id}</span><span class="text-emerald-600 bg-emerald-50 px-2 rounded">AI: ${item.importance_score}</span></div>
+                        <div class="flex gap-2"><span class="text-[10px] bg-zinc-800 text-white px-2 py-0.5 rounded-full">${item.interest_topic}</span><span class="text-emerald-600 bg-emerald-50 px-2 rounded">AI: ${item.importance_score}</span></div>
                     </div>
                     <a href="${item.url}" target="_blank" class="text-[17px] font-semibold mb-3 block">${item.title}</a>
                     <p class="text-[14px] text-zinc-600 mb-5 flex-1">${item.summary}</p>
