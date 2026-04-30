@@ -1,0 +1,27 @@
+{
+  "name": "radar-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-29",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  // 1. 绑定 D1 数据库 (金库)
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "intel_radar_db",
+      "database_id": "f5cb6ef9-20d8-4ad7-8519-55aa8678e8e4"
+    }
+  ],
+  // 2. 绑定 Vectorize (向量库)
+  "vectorize": [
+    {
+      "binding": "VECTOR_INDEX",
+      "index_name": "intel_vector_index"
+    }
+  ],
+  // 3. 绑定边缘 AI 算力
+  "ai": {
+    "binding": "AI"
+  }
+}
