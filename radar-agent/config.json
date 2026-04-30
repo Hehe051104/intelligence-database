@@ -20,8 +20,8 @@
     {
       "id": "Reddit_Global",
       "name": "全球公域舆论 (Reddit)",
-      "trending_url": "https://www.reddit.com/r/popular/top/.rss?t=day&limit=3",
-      "search_url": "https://www.reddit.com/search.rss?q={keyword}&sort=top&limit=2"
+      "trending_url": "https://www.reddit.com/r/popular/top/.rss?t=day&limit=1",
+      "search_url": "https://www.reddit.com/search.rss?q={keyword}&sort=top&limit=1"
     },
     {
       "id": "HackerNews",
@@ -32,8 +32,8 @@
     {
       "id": "arXiv",
       "name": "学术前沿 (arXiv)",
-      "trending_url": "http://export.arxiv.org/api/query?search_query=cat:cs.AI+OR+cat:cs.LG+OR+cat:physics.gen-ph+OR+cat:quant-ph&sortBy=submittedDate&max_results=4",
-      "search_url": "http://export.arxiv.org/api/query?search_query=all:{keyword}&sortBy=submittedDate&max_results=2"
+      "trending_url": "http://export.arxiv.org/api/query?search_query=cat:cs.AI+OR+cat:cs.LG+OR+cat:physics.gen-ph+OR+cat:quant-ph&sortBy=submittedDate&max_results=1",
+      "search_url": "http://export.arxiv.org/api/query?search_query=all:{keyword}&sortBy=submittedDate&max_results=1"
     }
   ]
 }

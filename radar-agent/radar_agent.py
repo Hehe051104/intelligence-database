@@ -40,68 +40,68 @@ def universal_fetcher(source_name, target_url):
         return []
 
 def analyze_with_gemini(title, content, source):
-    """
-    终极洗稿引擎：搭载 gemma-4-31b-it 高额度模型，配备 HTTP 防御装甲
-    """
     if not GEMINI_API_KEY: return None
     
-    # 核心突破：精准对接 Gemma 4 31B 的真实 API 代号
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent?key={GEMINI_API_KEY}"
     
+    # 【优化1】给 Gemma 降低理解难度，提供一个标准的 JSON 骨架让它填空
     prompt = f"""
-    作为专业科技情报分析员，请提炼以下内容。
-    来源：{source}
-    标题：{title}
-    正文片段：{content[:1500]}
-    
-    请严格返回如下 JSON（不可包含 Markdown 代码块或额外文字）：
+    You are a data extractor. Reply ONLY with a valid JSON object. Do not say "Here is the json" or any other text.
+    Source: {source}
+    Title: {title}
+    Text: {content[:1000]}
+
+    Output strict JSON matching this structure:
     {{
-        "summary": "用中文写一段50字左右的核心摘要",
-        "tags": "3个英文核心标签，逗号分隔",
-        "importance_score": 1到10的整数评估含金量,
+        "summary": "50字内中文核心摘要",
+        "tags": "3个英文标签,逗号分隔",
+        "importance_score": 8,
         "tech_difficulty": "Hard/Medium/Easy",
-        "social_value": "一句话中文描述其潜在的应用场景"
+        "social_value": "一句话中文描述落地场景"
     }}
     """
     
     try:
+        # 【优化2】容忍度拉满！把超时时间从 20 秒暴增到 60 秒
         resp = requests.post(
             url, 
             headers={"Content-Type": "application/json"},
             json={"contents": [{"parts": [{"text": prompt}]}]},
-            timeout=20
+            timeout=60 
         )
         
-        # 🛡️ 绝对防御：状态码异常直接抛弃，绝不解析
         if resp.status_code != 200:
-            if resp.status_code == 429:
-                print("  └─ ⏳ [限流警告] Gemma 的宽裕额度也被打满，请求抛弃。")
-            else:
-                print(f"  └─ ❌ [API 拒绝] 状态码: {resp.status_code} | 详情: {resp.text[:150]}")
+            print(f"  └─ ❌ [服务器崩溃] 状态码: {resp.status_code} (Google 后端算力节点异常)")
             return None
 
         resp_json = resp.json()
         
-        # 拦截安全审核机制
-        if 'promptFeedback' in resp_json and resp_json['promptFeedback'].get('blockReason'):
-            print(f"  └─ 🛡️ [安全拦截] 触发 Google 过滤规则，原因: {resp_json['promptFeedback']['blockReason']}")
-            return None
-
         candidates = resp_json.get('candidates')
         if not candidates or not candidates[0].get('content'):
-            print(f"  └─ ⚠️ [空响应] API 接收成功但未返回有效载荷。")
+            print(f"  └─ ⚠️ [空响应] Gemma 思考完毕，但交了白卷。")
             return None
             
         raw_text = candidates[0]['content']['parts'][0]['text']
-        cleaned_text = raw_text.strip().removeprefix("```json").removesuffix("```").strip()
+        
+        # 【优化3】暴力的文本清洗：强行截取第一对大括号中间的内容
+        start_idx = raw_text.find('{')
+        end_idx = raw_text.rfind('}')
+        if start_idx == -1 or end_idx == -1:
+             print(f"  └─ ⚠️ [幻觉暴走] Gemma 拒绝输出 JSON。它的原话是: {raw_text[:50]}...")
+             return None
+             
+        cleaned_text = raw_text[start_idx:end_idx+1]
         
         return json.loads(cleaned_text)
         
-    except json.decoder.JSONDecodeError as e:
-         print(f"  └─ ⚠️ [大模型幻觉] 强行输出非 JSON 格式: {e}")
+    except requests.exceptions.Timeout:
+         print("  └─ ⚠️ [算力超时] Gemma 31B 思考超过了 60 秒，战术放弃该情报。")
+         return None
+    except json.decoder.JSONDecodeError:
+         print(f"  └─ ⚠️ [语法错误] Gemma 写出了残缺的 JSON 结构，无法解析。")
          return None
     except Exception as e:
-        print(f"  └─ ⚠️ [底层异常] 管线崩溃: {e}")
+        print(f"  └─ ⚠️ [底层异常] {e}")
         return None
 
 # ================= 主控制流 =================
