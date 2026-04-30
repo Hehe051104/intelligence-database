@@ -1,29 +1,49 @@
 {
   "interests": [
     {
+      "id": "trending",
+      "display_name": "🔥 全网实时热榜",
+      "keyword": ""
+    },
+    {
       "id": "autonomous_driving",
       "display_name": "🚘 自动驾驶与机器人",
-      "keyword": "robotics"
+      "keyword": "robotics OR autonomous driving OR ROS"
+    },
+    {
+      "id": "ai_general",
+      "display_name": "🤖 人工智能前沿",
+      "keyword": "artificial intelligence OR AGI"
+    },
+    {
+      "id": "deep_learning",
+      "display_name": "🧠 深度学习与大模型",
+      "keyword": "deep learning OR LLM OR transformer OR RAG"
+    },
+    {
+      "id": "vpn_proxy",
+      "display_name": "🌐 网络突破与隐私",
+      "keyword": "VPN OR wireguard OR proxy OR censorship"
     }
   ],
   "sources": [
     {
       "id": "Reddit_Global",
       "name": "Reddit",
-      "trending_url": "https://www.reddit.com/r/popular/top/.rss?t=day&limit=1",
-      "search_url": "https://www.reddit.com/search.rss?q={keyword}&sort=top&limit=1"
+      "trending_url": "https://www.reddit.com/r/popular/top/.rss?t=day&limit=5",
+      "search_url": "https://www.reddit.com/search.rss?q={keyword}&sort=top&limit=5"
     },
     {
       "id": "HackerNews",
       "name": "Hacker News",
-      "trending_url": "https://hnrss.org/frontpage?points=100&count=1",
-      "search_url": "https://hnrss.org/newest?q={keyword}&count=1"
+      "trending_url": "https://hnrss.org/frontpage?points=100&count=5",
+      "search_url": "https://hnrss.org/newest?q={keyword}&count=5"
     },
     {
       "id": "arXiv",
       "name": "arXiv",
-      "trending_url": "http://export.arxiv.org/api/query?search_query=cat:cs.AI&max_results=1",
-      "search_url": "http://export.arxiv.org/api/query?search_query=all:{keyword}&max_results=1"
+      "trending_url": "http://export.arxiv.org/api/query?search_query=cat:cs.AI&sortBy=submittedDate&max_results=5",
+      "search_url": "http://export.arxiv.org/api/query?search_query=all:{keyword}&sortBy=submittedDate&max_results=5"
     }
   ]
 }

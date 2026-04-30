@@ -45,14 +45,12 @@ def universal_fetcher(source_name, target_url):
 
 def analyze_with_gemini(title, content, source):
     """
-    终极架构：通过 OpenAI SDK 兼容层精准调用 gemini-3.1-flash-lite
-    代码极度干爽，将网络底层逻辑全盘交给官方 SDK
+    终极架构：精准对接 gemini-3.1-flash-lite-preview
     """
     if not GEMINI_API_KEY:
         print("🚨 错误：未检测到 GEMINI_API_KEY")
         return None
 
-    # 初始化 OpenAI 客户端，但把枪口对准 Google 的服务器
     client = OpenAI(
         api_key=GEMINI_API_KEY,
         base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
@@ -74,7 +72,6 @@ def analyze_with_gemini(title, content, source):
     """
 
     try:
-        # 🎯 完美调用你指定的 3.1 Lite 模型
         res = client.chat.completions.create(
             model="gemini-3.1-flash-lite-preview",
             messages=[
@@ -86,8 +83,6 @@ def analyze_with_gemini(title, content, source):
         )
 
         raw_text = res.choices[0].message.content.strip()
-        
-        # 极简清洗：去掉可能带有的 Markdown 代码块标记
         cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
         return json.loads(cleaned_text)
 
@@ -106,7 +101,6 @@ def main():
     all_raw_data = []
     print("\n⚡ 矩阵引擎启动，正在切入 Gemini 3.1 Flash Lite 轨道...\n")
 
-    # 1. 采集数据
     for source in config.get("sources", []):
         print(f"▶ 数据源: {source['name']}")
         for interest in config.get("interests", []):
@@ -120,25 +114,34 @@ def main():
 
     print(f"\n⚡ 抓获 {len(all_raw_data)} 条情报，开始提纯...\n")
 
-    # 2. 提纯入库
     for item in all_raw_data:
         print(f"🎯 处理: {item['title'][:40]}...")
         ai_data = analyze_with_gemini(item['title'], item['content'], item['source'])
         
-        # 分数阈值卡在 5 分，及格线以上才入库
         if ai_data and int(ai_data.get("importance_score", 0)) >= 5:
             print(f"✅ 评分: {ai_data['importance_score']} | 正在跨海入库...")
             
+            # 🛡️ 强制数据净化：绝不相信大模型的节操
+            safe_tags = ai_data.get("tags", "")
+            if isinstance(safe_tags, list):
+                safe_tags = ", ".join([str(t) for t in safe_tags]) # 强行把数组拍扁成字符串
+
+            safe_score = 5
+            try:
+                safe_score = int(ai_data.get("importance_score", 5)) # 强行转整数
+            except:
+                pass
+
             payload = {
-                "title": item["title"],
-                "summary": ai_data["summary"],
-                "url": item["url"],
-                "source_type": item["source"],
-                "tags": ai_data["tags"],
-                "importance_score": ai_data["importance_score"],
-                "tech_difficulty": ai_data["tech_difficulty"],
-                "social_value": ai_data["social_value"],
-                "interest_id": item["interest_id"]
+                "title": str(item.get("title", "")),
+                "summary": str(ai_data.get("summary", "")),
+                "url": str(item.get("url", "")),
+                "source_type": str(item.get("source", "")),
+                "tags": str(safe_tags),
+                "importance_score": safe_score,
+                "tech_difficulty": str(ai_data.get("tech_difficulty", "Medium")),
+                "social_value": str(ai_data.get("social_value", "")),
+                "interest_id": str(item.get("interest_id", ""))
             }
             
             try:
@@ -146,14 +149,14 @@ def main():
                 if res.status_code == 200:
                     print(f"🚀 [入库成功]！")
                 else:
-                    print(f"⚠️ [入库失败] 状态码: {res.status_code}")
+                    print(f"⚠️ [入库失败] 状态码: {res.status_code} | {res.text[:100]}")
             except Exception as e:
                 print(f"⚠️ [网络异常] 无法连接 Worker: {e}")
         else:
             print(f"🗑️ [抛弃] 价值不足或处理失败")
             
         print("⏳ 冷却管线 1.5 秒...\n")
-        time.sleep(1.5) # 完美适配每天 500 次的限流节奏
+        time.sleep(1.5)
 
 if __name__ == "__main__":
     main()
