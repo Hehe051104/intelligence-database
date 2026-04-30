@@ -32,57 +32,28 @@ HEADERS = {
 # 情报源获取模块 (多维触角)
 # ==========================================
 
-def fetch_arxiv(query="cat:cs.AI", max_results=2):
-    """学术触角：抓取最新论文"""
-    print(f"📡 [arXiv] 扫描 {query} 最新论文...")
-    url = f"http://export.arxiv.org/api/query?search_query={query}&sortBy=submittedDate&sortOrder=descending&max_results={max_results}"
+def load_config():
+    config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+    with open(config_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def universal_fetcher(source_name, target_url):
+    """终极情报抓取器：只认标准 RSS/Atom 协议，不问出处"""
+    print(f"  └─ 📡 扫描信号: {target_url[:60]}...")
     try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
+        response = requests.get(target_url, headers=HEADERS, timeout=10)
         response.raise_for_status()
         entries = feedparser.parse(response.content).entries
-        # 标准化数据格式
-        return [{"title": e.title, "content": e.summary, "url": e.link, "source": "arXiv"} for e in entries]
-    except Exception as e:
-        print(f"❌ [arXiv 阻断] {e}")
-        return []
-
-def fetch_reddit(subreddit="MachineLearning", max_results=2):
-    """舆情触角：抓取 Reddit 每日最热"""
-    print(f"📡 [Reddit] 渗透 r/{subreddit} 每日热榜...")
-    url = f"https://www.reddit.com/r/{subreddit}/top/.rss?t=day&limit={max_results}"
-    try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
-        response.raise_for_status()
-        entries = feedparser.parse(response.content).entries
-        return [{"title": e.title, "content": e.summary, "url": e.link, "source": "Reddit"} for e in entries]
-    except Exception as e:
-        print(f"❌ [Reddit 阻断] {e}")
-        return []
-
-def fetch_github(query="autonomous driving OR ROS language:python", max_results=2):
-    """开源触角：抓取 GitHub 高星代码库"""
-    print(f"📡 [GitHub] 搜刮 '{query}' 相关的热门项目...")
-    # 查找过去7天内创建或更新的高星项目
-    last_week = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-    url = f"https://api.github.com/search/repositories?q={query} pushed:>{last_week}&sort=stars&order=desc&per_page={max_results}"
-    
-    headers = HEADERS.copy()
-    headers["Accept"] = "application/vnd.github.v3+json"
-    if GITHUB_TOKEN:
-        headers["Authorization"] = f"token {GITHUB_TOKEN}"
-
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        items = response.json().get("items", [])
+        
+        # 统一格式化输出
         return [{
-            "title": i["full_name"], 
-            "content": f"{i['description']} | 语言: {i['language']} | Stars: {i['stargazers_count']}", 
-            "url": i["html_url"], 
-            "source": "GitHub"
-        } for i in items]
+            "title": e.title, 
+            "content": getattr(e, 'summary', getattr(e, 'description', '')), 
+            "url": getattr(e, 'link', ''), 
+            "source": source_name
+        } for e in entries]
     except Exception as e:
-        print(f"❌ [GitHub 阻断] {e}")
+        print(f"  └─ ❌ [节点阻断] {e}")
         return []
 
 # ==========================================
@@ -115,74 +86,43 @@ def analyze_with_gemini(title, content, source_type):
         print(f"❌ [大模型崩溃] {e}")
         return None
 
-def load_config():
-    """读取外部配置文件"""
-    config_path = os.path.join(os.path.dirname(__file__), 'config.json')
-    try:
-        with open(config_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"🚨 [致命错误] 无法读取 config.json: {e}")
-        return None
-
 def main():
     config = load_config()
-    if not config:
-        return
+    if not config: return
 
     all_raw_data = []
-    sources = config.get("sources", {})
-
-    print("\n⚡ 正在解析指挥部 config.json 配置文件...\n")
-
-    # 1. 动态加载 arXiv 任务
-    for task in sources.get("arxiv", []):
-        all_raw_data.extend(fetch_arxiv(query=task["query"], max_results=task["max_results"]))
-
-    # 2. 动态加载 Reddit 任务
-    for task in sources.get("reddit", []):
-        all_raw_data.extend(fetch_reddit(subreddit=task["subreddit"], max_results=task["max_results"]))
-
-    # 3. 动态加载 GitHub 任务
-    for task in sources.get("github", []):
-        all_raw_data.extend(fetch_github(query=task["query"], max_results=task["max_results"]))
     
-    print(f"\n⚡ 舰队集结完毕，共抓获 {len(all_raw_data)} 条原始情报，开始清洗...\n")
+    print("\n⚡ 矩阵引擎启动，开始执行 [数据源] x [兴趣点] 交叉扫描...\n")
 
-    # ---------------- 这里的清洗与入库逻辑保持不变 ----------------
-    for item in all_raw_data:
-        print(f"🎯 [锁定] [{item['source']}] {item['title']}")
+    # 核心：双层循环的笛卡尔积检索
+    for source in config.get("sources", []):
+        print(f"▶ 正在接入数据源: {source['name']}")
         
-        ai_data = analyze_with_gemini(item['title'], item['content'], item['source'])
-        
-        if not ai_data or ai_data.get("importance_score", 0) < 5:
-            print(f"🗑️ [抛弃] 价值过低，已过滤。")
-            time.sleep(2) 
-            continue
+        for interest in config.get("interests", []):
+            interest_id = interest["id"]
+            keyword = interest["keyword"]
             
-        print(f"✅ [提纯] 评分: {ai_data['importance_score']} | 标签: {ai_data['tags']}")
-        
-        payload = {
-            "title": item["title"],
-            "summary": ai_data["summary"],
-            "url": item["url"],
-            "source_type": item["source"],
-            "tags": ai_data["tags"],
-            "importance_score": ai_data["importance_score"],
-            "tech_difficulty": ai_data["tech_difficulty"],
-            "social_value": ai_data["social_value"]
-        }
-        
-        headers = {"Authorization": f"Bearer {AUTH_TOKEN}", "Content-Type": "application/json"}
-        response = requests.post(CF_WORKER_URL, json=payload, headers=headers)
-        
-        if response.status_code == 200:
-            print(f"🚀 [入库成功] {item['source']} 情报已发送！")
-        else:
-            print(f"⚠️ [入库失败] {response.text}")
+            # 逻辑分流：是抓全网热门，还是抓特定关键词？
+            if interest_id == "trending":
+                target_url = source["trending_url"]
+                print(f"  ├─ [任务] 探测默认全网热门")
+            else:
+                # 把关键词进行 URL 编码后填入模板
+                encoded_keyword = quote(keyword)
+                target_url = source["search_url"].replace("{keyword}", encoded_keyword)
+                print(f"  ├─ [任务] 追踪兴趣点: {interest['display_name']}")
             
-        print("⏳ 冷却管线 5 秒...\n")
-        time.sleep(5)
+            # 丢给万能抓取器
+            fetched_items = universal_fetcher(source["id"], target_url)
+            
+            # 极其重要：在原始数据中打上“兴趣标签”，方便前端过滤
+            for item in fetched_items:
+                item['interest_id'] = interest_id
+            
+            all_raw_data.extend(fetched_items)
+            time.sleep(1) # 避免触发反爬
+
+    print(f"\n⚡ 舰队集结完毕，共抓获 {len(all_raw_data)} 条原始情报，准备提纯入库...\n")
 
 if __name__ == "__main__":
     main()

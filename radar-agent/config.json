@@ -1,17 +1,33 @@
 {
-  "sources": {
-    "arxiv": [
-      { "query": "cat:cs.AI", "max_results": 2 },
-      { "query": "cat:cs.RO", "max_results": 1 } 
-    ],
-    "reddit": [
-      { "subreddit": "MachineLearning", "max_results": 2 },
-      { "subreddit": "LocalLLaMA", "max_results": 2 },
-      { "subreddit": "SelfDrivingCars", "max_results": 1 }
-    ],
-    "github": [
-      { "query": "autonomous driving OR brain computer interface", "max_results": 2 },
-      { "query": "agentic workflow language:python", "max_results": 1 }
-    ]
-  }
+  "interests": [
+    {
+      "id": "trending",
+      "display_name": "🔥 全网实时热榜 (无差别扫描)",
+      "keyword": ""
+    },
+    {
+      "id": "autonomous_driving",
+      "display_name": "🚘 自动驾驶",
+      "keyword": "autonomous driving"
+    },
+    {
+      "id": "rag_llm",
+      "display_name": "🧠 RAG与大模型",
+      "keyword": "Retrieval-Augmented Generation OR LLM"
+    }
+  ],
+  "sources": [
+    {
+      "id": "Reddit_Global",
+      "name": "全球公域舆论 (Reddit)",
+      "trending_url": "https://www.reddit.com/r/popular/top/.rss?t=day&limit=3",
+      "search_url": "https://www.reddit.com/search.rss?q={keyword}&sort=top&limit=3"
+    },
+    {
+      "id": "HackerNews",
+      "name": "极客风向标 (Hacker News)",
+      "trending_url": "https://hnrss.org/frontpage?points=100",
+      "search_url": "https://hnrss.org/newest?q={keyword}"
+    }
+  ]
 }
