@@ -2,17 +2,17 @@
   "interests": [
     {
       "id": "trending",
-      "display_name": "🔥 全网实时热榜 (无差别扫描)",
+      "display_name": "🔥 全网实时热榜",
       "keyword": ""
     },
     {
       "id": "autonomous_driving",
-      "display_name": "🚘 自动驾驶",
-      "keyword": "autonomous driving"
+      "display_name": "🚘 自动驾驶与机器人",
+      "keyword": "autonomous driving OR robotics OR ROS"
     },
     {
       "id": "rag_llm",
-      "display_name": "🧠 RAG与大模型",
+      "display_name": "🧠 大模型与RAG",
       "keyword": "Retrieval-Augmented Generation OR LLM"
     }
   ],
@@ -21,13 +21,19 @@
       "id": "Reddit_Global",
       "name": "全球公域舆论 (Reddit)",
       "trending_url": "https://www.reddit.com/r/popular/top/.rss?t=day&limit=3",
-      "search_url": "https://www.reddit.com/search.rss?q={keyword}&sort=top&limit=3"
+      "search_url": "https://www.reddit.com/search.rss?q={keyword}&sort=top&limit=2"
     },
     {
       "id": "HackerNews",
       "name": "极客风向标 (Hacker News)",
       "trending_url": "https://hnrss.org/frontpage?points=100",
       "search_url": "https://hnrss.org/newest?q={keyword}"
+    },
+    {
+      "id": "arXiv",
+      "name": "学术前沿 (arXiv)",
+      "trending_url": "http://export.arxiv.org/api/query?search_query=cat:cs.AI+OR+cat:cs.LG+OR+cat:physics.gen-ph+OR+cat:quant-ph&sortBy=submittedDate&max_results=4",
+      "search_url": "http://export.arxiv.org/api/query?search_query=all:{keyword}&sortBy=submittedDate&max_results=2"
     }
   ]
 }
