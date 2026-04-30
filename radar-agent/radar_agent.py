@@ -115,16 +115,41 @@ def analyze_with_gemini(title, content, source_type):
         print(f"❌ [大模型崩溃] {e}")
         return None
 
+def load_config():
+    """读取外部配置文件"""
+    config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"🚨 [致命错误] 无法读取 config.json: {e}")
+        return None
+
 def main():
-    # 1. 组建混合舰队：同时出击三大数据源
+    config = load_config()
+    if not config:
+        return
+
     all_raw_data = []
-    all_raw_data.extend(fetch_arxiv(query="cat:cs.AI", max_results=1))
-    all_raw_data.extend(fetch_reddit(subreddit="MachineLearning", max_results=1))
-    all_raw_data.extend(fetch_github(query="autonomous driving OR brain computer interface", max_results=1))
+    sources = config.get("sources", {})
+
+    print("\n⚡ 正在解析指挥部 config.json 配置文件...\n")
+
+    # 1. 动态加载 arXiv 任务
+    for task in sources.get("arxiv", []):
+        all_raw_data.extend(fetch_arxiv(query=task["query"], max_results=task["max_results"]))
+
+    # 2. 动态加载 Reddit 任务
+    for task in sources.get("reddit", []):
+        all_raw_data.extend(fetch_reddit(subreddit=task["subreddit"], max_results=task["max_results"]))
+
+    # 3. 动态加载 GitHub 任务
+    for task in sources.get("github", []):
+        all_raw_data.extend(fetch_github(query=task["query"], max_results=task["max_results"]))
     
     print(f"\n⚡ 舰队集结完毕，共抓获 {len(all_raw_data)} 条原始情报，开始清洗...\n")
 
-    # 2. 流水线作业
+    # ---------------- 这里的清洗与入库逻辑保持不变 ----------------
     for item in all_raw_data:
         print(f"🎯 [锁定] [{item['source']}] {item['title']}")
         
@@ -132,7 +157,7 @@ def main():
         
         if not ai_data or ai_data.get("importance_score", 0) < 5:
             print(f"🗑️ [抛弃] 价值过低，已过滤。")
-            time.sleep(2) # 防并发限流
+            time.sleep(2) 
             continue
             
         print(f"✅ [提纯] 评分: {ai_data['importance_score']} | 标签: {ai_data['tags']}")
@@ -141,7 +166,7 @@ def main():
             "title": item["title"],
             "summary": ai_data["summary"],
             "url": item["url"],
-            "source_type": item["source"], # 极其关键：前端筛选项的基石
+            "source_type": item["source"],
             "tags": ai_data["tags"],
             "importance_score": ai_data["importance_score"],
             "tech_difficulty": ai_data["tech_difficulty"],

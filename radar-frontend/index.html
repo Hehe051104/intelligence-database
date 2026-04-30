@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>情报终端 | Claude 极简高密版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Claude 核心审美：宣纸白底色，深灰字体，克制的边框与阴影 */
+        body { background-color: #FDFCFB; color: #2D2D2D; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        
+        /* 丝滑的卡片悬浮反馈 */
+        .intel-card { 
+            background: #FFFFFF;
+            border: 1px solid #E4E4E7;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02); 
+            transition: all 0.2s ease-out; 
+        }
+        .intel-card:hover { 
+            box-shadow: 0 8px 24px -4px rgba(0,0,0,0.06); 
+            transform: translateY(-2px);
+            border-color: #D4D4D8;
+        }
+
+        /* 低饱和度的数据源徽章 (高级感来源) */
+        .badge-arXiv { background-color: #FEF2F2; color: #991B1B; border: 1px solid #FEE2E2; }
+        .badge-GitHub { background-color: #F8FAFC; color: #334155; border: 1px solid #F1F5F9; }
+        .badge-Reddit { background-color: #FFF7ED; color: #C2410C; border: 1px solid #FFEDD5; }
+        
+        /* 隐藏掉丑陋的滚动条，保持洁癖 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #E4E4E7; border-radius: 10px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-10 px-6">
+
+    <!-- 顶栏与核心搜索：克制而优雅 -->
+    <div class="w-full max-w-7xl mb-10 flex flex-col items-center">
+        <h1 class="text-3xl font-semibold tracking-tight text-zinc-800 mb-8">SPEC-2026  情报库</h1>
+        
+        <div class="w-full max-w-3xl relative shadow-sm rounded-2xl">
+            <input type="text" id="searchInput" placeholder="输入自然语言指令进行向量检索 (例: 脑机接口的最新应用)..." 
+                class="w-full bg-white border border-zinc-200 text-zinc-800 rounded-2xl pl-6 pr-32 py-4 focus:outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 transition-all text-base"
+                onkeypress="if(event.key === 'Enter') fetchIntelligence()">
+            <button onclick="fetchIntelligence()" 
+                class="absolute right-2 top-1/2 -translate-y-1/2 bg-zinc-800 hover:bg-zinc-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors">
+                扫描
+            </button>
+        </div>
+    </div>
+
+    <!-- 主体区域：保持左控制台 + 右侧双列高密度瀑布流 -->
+    <div class="w-full max-w-7xl flex gap-8 items-start">
+        
+        <!-- 左侧导航：极简侧边栏 -->
+        <div class="w-56 shrink-0 sticky top-10">
+            <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 pl-2">数据源频段</h3>
+            <div class="flex flex-col gap-1">
+                <label class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-zinc-100 transition-colors text-zinc-600 font-medium">
+                    <input type="radio" name="sourceFilter" value="ALL" checked class="accent-zinc-800" onchange="renderCards()"> 
+                    全局监听 (ALL)
+                </label>
+                <label class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-zinc-100 transition-colors text-zinc-600 font-medium">
+                    <input type="radio" name="sourceFilter" value="arXiv" class="accent-zinc-800" onchange="renderCards()"> 
+                    学术前沿 (arXiv)
+                </label>
+                <label class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-zinc-100 transition-colors text-zinc-600 font-medium">
+                    <input type="radio" name="sourceFilter" value="GitHub" class="accent-zinc-800" onchange="renderCards()"> 
+                    开源代码 (GitHub)
+                </label>
+                <label class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-zinc-100 transition-colors text-zinc-600 font-medium">
+                    <input type="radio" name="sourceFilter" value="Reddit" class="accent-zinc-800" onchange="renderCards()"> 
+                    极客舆论 (Reddit)
+                </label>
+            </div>
+        </div>
+
+        <!-- 右侧情报展示区：采用双列 Grid 布局，极大提升信息密度 -->
+        <div class="flex-1 w-full">
+            <div id="resultsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6 align-top">
+                <div class="col-span-full text-zinc-400 text-center py-20 font-mono text-sm">等待唤醒云端向量矩阵...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const GATEWAY_URL = "https://radar-gateway.lzhien591.workers.dev/";
+        let currentData = [];
+
+        async function fetchIntelligence() {
+            const query = document.getElementById('searchInput').value.trim();
+            const container = document.getElementById('resultsContainer');
+            
+            // Claude 风格的加载提示：柔和的脉冲动画
+            container.innerHTML = '<div class="col-span-full text-zinc-500 text-center py-20 animate-pulse">正在执行高维空间检索...</div>';
+
+            try {
+                const targetUrl = query ? `${GATEWAY_URL}?q=${encodeURIComponent(query)}` : GATEWAY_URL;
+                const response = await fetch(targetUrl);
+                if (!response.ok) throw new Error("网关连接被重置");
+                
+                currentData = await response.json();
+                renderCards();
+            } catch (error) {
+                container.innerHTML = `<div class="col-span-full text-red-500 text-center py-20 bg-red-50 rounded-2xl border border-red-100">❌ 连接崩溃: ${error.message}</div>`;
+            }
+        }
+
+        function renderCards() {
+            const container = document.getElementById('resultsContainer');
+            const selectedSource = document.querySelector('input[name="sourceFilter"]:checked').value;
+            
+            container.innerHTML = ''; 
+
+            const filteredData = currentData.filter(item => 
+                selectedSource === 'ALL' ? true : item.source_type === selectedSource
+            );
+
+            if (filteredData.length === 0) {
+                container.innerHTML = '<div class="col-span-full text-zinc-400 text-center py-20 bg-zinc-50 rounded-2xl border border-zinc-100">未在当前频段侦测到相关信号。</div>';
+                return;
+            }
+
+            // 渲染高密度卡片
+            filteredData.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "intel-card p-6 rounded-2xl flex flex-col h-full";
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-[11px] font-bold px-2.5 py-1 uppercase tracking-wider rounded-md badge-${item.source_type}">
+                            ${item.source_type}
+                        </span>
+                        <span class="text-[12px] font-medium text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-md">
+                            AI 评分: <strong class="text-zinc-800">${item.importance_score}</strong>
+                        </span>
+                    </div>
+                    
+                    <a href="${item.url}" target="_blank" class="text-[17px] font-semibold text-zinc-900 hover:text-blue-600 leading-snug mb-3 line-clamp-2">
+                        ${item.title}
+                    </a>
+                    
+                    <p class="text-[14px] text-zinc-600 leading-relaxed mb-5 flex-1">
+                        ${item.summary}
+                    </p>
+                    
+                    <div class="bg-[#F8FAFC] border border-zinc-100 rounded-xl p-3 mb-4">
+                        <div class="text-[12px] font-semibold text-zinc-800 mb-1 flex items-center gap-1">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-zinc-500"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                            落地价值推演
+                        </div>
+                        <div class="text-[13px] text-zinc-600 leading-relaxed">
+                            ${item.social_value}
+                        </div>
+                    </div>
+
+                    <div class="text-[12px] text-zinc-400 font-mono truncate pt-2 border-t border-zinc-100 mt-auto">
+                        # ${item.tags.split(',').map(t => t.trim()).join(' #')}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        window.onload = fetchIntelligence;
+    </script>
+</body>
+</html>
