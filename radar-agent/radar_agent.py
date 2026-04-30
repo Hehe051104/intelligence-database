@@ -46,7 +46,7 @@ def universal_fetcher(source_name, target_url):
         return []
 
 def analyze_with_glm(title, content, source):
-    """极简洗稿引擎：精准调用 GLM-4.7-Flash"""
+    """极简洗稿引擎：精准调用 GLM-4.7-Flash（附带自动重试装甲）"""
     if not ZHIPU_API_KEY: return None
 
     prompt = f"""
@@ -64,26 +64,42 @@ def analyze_with_glm(title, content, source):
     }}
     """
 
-    try:
-        # 🎯 严格使用 glm-4.7-flash 模型
-        res = client.chat.completions.create(
-            model="glm-4.7-flash", 
-            messages=[
-                {"role": "system", "content": "你是一个只输出 JSON 的情报分析机器。"},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.1, 
-            timeout=30 
-        )
+    max_retries = 3  # 最大重试次数
+    retry_delay = 5  # 初始等待秒数
 
-        raw_text = res.choices[0].message.content.strip()
-        # 兼容处理可能出现的 Markdown 标签
-        cleaned_text = raw_text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-        return json.loads(cleaned_text)
+    for attempt in range(max_retries):
+        try:
+            # 🎯 严格使用 glm-4.7-flash 模型
+            res = client.chat.completions.create(
+                model="glm-4.7-flash", 
+                messages=[
+                    {"role": "system", "content": "你是一个只输出 JSON 的情报分析机器。"},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.1, 
+                timeout=30 
+            )
 
-    except Exception as e:
-        print(f"  └─ ⚠️ [处理异常] {e}")
-        return None
+            raw_text = res.choices[0].message.content.strip()
+            # 兼容处理可能出现的 Markdown 标签
+            cleaned_text = raw_text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+            return json.loads(cleaned_text)
+
+        except Exception as e:
+            error_msg = str(e)
+            # 精准狙击智谱的限流和拥挤报错
+            if "429" in error_msg or "1302" in error_msg or "1305" in error_msg:
+                wait_time = retry_delay * (2 ** attempt) # 指数退避：5秒 -> 10秒 -> 20秒
+                print(f"  └─ ⏳ [流量控制] 触发限流防御，{wait_time}秒后进行第 {attempt+1} 次重试...")
+                import time # 确保引入time模块
+                time.sleep(wait_time)
+            else:
+                # 如果是其他代码错误，直接抛弃不重试
+                print(f"  └─ ⚠️ [处理异常] {e}")
+                return None
+                
+    print("  └─ ❌ [彻底死心] 连续 3 次被服务器踢出，战术放弃该情报。")
+    return None
 
 # ================= 主控制流 =================
 def main():
