@@ -40,26 +40,27 @@ def universal_fetcher(source_name, target_url):
         return []
 
 def analyze_with_gemini(title, content, source):
-    """调用 Gemini 2.5 进行数据清洗与高维特征提取"""
-    if not GEMINI_API_KEY:
-        print("🚨 未检测到 GEMINI_API_KEY 环境变量！")
-        return None
-        
+    """
+    终极洗稿引擎：搭载 gemma-4-31b-it 高额度模型，配备 HTTP 防御装甲
+    """
+    if not GEMINI_API_KEY: return None
+    
+    # 核心突破：精准对接 Gemma 4 31B 的真实 API 代号
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent?key={GEMINI_API_KEY}"
     
     prompt = f"""
-    作为顶尖科技情报分析师，请精简以下内容。
+    作为专业科技情报分析员，请提炼以下内容。
     来源：{source}
     标题：{title}
     正文片段：{content[:1500]}
     
-    请严格返回以下JSON格式（不要包含任何Markdown代码块标记）：
+    请严格返回如下 JSON（不可包含 Markdown 代码块或额外文字）：
     {{
-        "summary": "用中文写一段50字左右的核心摘要，一针见血。",
+        "summary": "用中文写一段50字左右的核心摘要",
         "tags": "3个英文核心标签，逗号分隔",
-        "importance_score": 1到10的整数评估其技术含金量,
+        "importance_score": 1到10的整数评估含金量,
         "tech_difficulty": "Hard/Medium/Easy",
-        "social_value": "一句话中文描述其潜在的应用场景或商业落地价值"
+        "social_value": "一句话中文描述其潜在的应用场景"
     }}
     """
     
@@ -67,17 +68,40 @@ def analyze_with_gemini(title, content, source):
         resp = requests.post(
             url, 
             headers={"Content-Type": "application/json"},
-            json={"contents": [{"parts": [{"text": prompt}]}]}
+            json={"contents": [{"parts": [{"text": prompt}]}]},
+            timeout=20
         )
+        
+        # 🛡️ 绝对防御：状态码异常直接抛弃，绝不解析
+        if resp.status_code != 200:
+            if resp.status_code == 429:
+                print("  └─ ⏳ [限流警告] Gemma 的宽裕额度也被打满，请求抛弃。")
+            else:
+                print(f"  └─ ❌ [API 拒绝] 状态码: {resp.status_code} | 详情: {resp.text[:150]}")
+            return None
+
         resp_json = resp.json()
         
-        # 提取 Gemini 返回的文本并清理可能的 markdown 标记
-        raw_text = resp_json['candidates'][0]['content']['parts'][0]['text']
+        # 拦截安全审核机制
+        if 'promptFeedback' in resp_json and resp_json['promptFeedback'].get('blockReason'):
+            print(f"  └─ 🛡️ [安全拦截] 触发 Google 过滤规则，原因: {resp_json['promptFeedback']['blockReason']}")
+            return None
+
+        candidates = resp_json.get('candidates')
+        if not candidates or not candidates[0].get('content'):
+            print(f"  └─ ⚠️ [空响应] API 接收成功但未返回有效载荷。")
+            return None
+            
+        raw_text = candidates[0]['content']['parts'][0]['text']
         cleaned_text = raw_text.strip().removeprefix("```json").removesuffix("```").strip()
         
         return json.loads(cleaned_text)
+        
+    except json.decoder.JSONDecodeError as e:
+         print(f"  └─ ⚠️ [大模型幻觉] 强行输出非 JSON 格式: {e}")
+         return None
     except Exception as e:
-        print(f"  └─ ⚠️ [AI 处理异常] {e}")
+        print(f"  └─ ⚠️ [底层异常] 管线崩溃: {e}")
         return None
 
 # ================= 主控制流 =================
