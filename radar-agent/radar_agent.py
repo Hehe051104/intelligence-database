@@ -88,8 +88,7 @@ def analyze_with_gemini(title, content, source):
         raw_text = res.choices[0].message.content.strip()
         
         # 极简清洗：去掉可能带有的 Markdown 代码块标记
-        cleaned_text = raw_text.replace("
-```json", "").replace("```", "").strip()
+        cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
         return json.loads(cleaned_text)
 
     except json.JSONDecodeError as e:
