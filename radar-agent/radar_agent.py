@@ -45,7 +45,7 @@ def analyze_with_gemini(title, content, source):
         print("🚨 未检测到 GEMINI_API_KEY 环境变量！")
         return None
         
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent?key={GEMINI_API_KEY}"
     
     prompt = f"""
     作为顶尖科技情报分析师，请精简以下内容。
